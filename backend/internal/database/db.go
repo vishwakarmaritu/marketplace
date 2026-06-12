@@ -31,6 +31,10 @@ func Connect() {
 		&models.User{},
 		&models.Product{},
 		&models.Coupon{},
+		&models.Cart{},
+		&models.CartItem{},
+		&models.Order{},
+		&models.OrderItem{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database schemas: %v", err)

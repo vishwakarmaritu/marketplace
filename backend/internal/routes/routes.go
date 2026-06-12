@@ -31,4 +31,16 @@ func RegisterRoutes() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status": "healthy", "message": "Server and database are responding cleanly"}`))
 	})
+
+	http.HandleFunc("/api/cart", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			middleware.RequireRole("buyer")(handlers.GetCart).ServeHTTP(w, r)
+		} else if r.Method == http.MethodPost {
+			middleware.RequireRole("buyer")(handlers.AddToCart).ServeHTTP(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	http.HandleFunc("/api/checkout", middleware.RequireRole("buyer")(handlers.Checkout))
 }
