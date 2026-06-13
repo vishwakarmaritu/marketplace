@@ -1,24 +1,19 @@
 package handlers
 
 import (
-	"encoding/json"
-	"net/http"
-
+	"github.com/gofiber/fiber/v2"
 	"github.com/vishwakarmaritu/marketplace/internal/database"
 	"github.com/vishwakarmaritu/marketplace/internal/models"
 )
 
-func Checkout(w http.ResponseWriter, r *http.Request) {
-
-	contextUserID := r.Context().Value("userID").(float64)
-	buyerID := uint(contextUserID)
+func Checkout(c *fiber.Ctx) error {
+	buyerID := uint(c.Locals("userID").(float64))
 
 	var cart models.Cart
 	result := database.DB.Preload("Items.Product").Where("user_id = ?", buyerID).First(&cart)
 
 	if result.Error != nil || len(cart.Items) == 0 {
-		http.Error(w, "Cannot checkout: Cart is empty", http.StatusBadRequest)
-		return
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot checkout: Cart is empty"})
 	}
 
 	var totalAmount float64
@@ -41,15 +36,13 @@ func Checkout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := database.DB.Create(&order).Error; err != nil {
-		http.Error(w, "Failed to create order", http.StatusInternalServerError)
-		return
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create order"})
 	}
 
 	database.DB.Where("cart_id = ?", cart.ID).Delete(&models.CartItem{})
 	database.DB.Delete(&cart)
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Order placed successfully",
 		"order":   order,
 	})

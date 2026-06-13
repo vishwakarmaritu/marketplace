@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
-	"net/http"
-
+	"github.com/gofiber/fiber/v2"
 	"github.com/vishwakarmaritu/marketplace/internal/database"
 	"github.com/vishwakarmaritu/marketplace/internal/models"
 )
@@ -13,15 +11,12 @@ type CartRequest struct {
 	Quantity  int  `json:"quantity"`
 }
 
-func AddToCart(w http.ResponseWriter, r *http.Request) {
-
-	contextUserID := r.Context().Value("userID").(float64)
-	buyerID := uint(contextUserID)
+func AddToCart(c *fiber.Ctx) error {
+	buyerID := uint(c.Locals("userID").(float64))
 
 	var req CartRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
 	var cart models.Cart
@@ -31,11 +26,9 @@ func AddToCart(w http.ResponseWriter, r *http.Request) {
 	result := database.DB.Where("cart_id = ? AND product_id = ?", cart.ID, req.ProductID).First(&cartItem)
 
 	if result.Error == nil {
-
 		cartItem.Quantity += req.Quantity
 		database.DB.Save(&cartItem)
 	} else {
-
 		cartItem = models.CartItem{
 			CartID:    cart.ID,
 			ProductID: req.ProductID,
@@ -44,22 +37,17 @@ func AddToCart(w http.ResponseWriter, r *http.Request) {
 		database.DB.Create(&cartItem)
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Item successfully added to cart"})
+	return c.JSON(fiber.Map{"message": "Item successfully added to cart"})
 }
 
-func GetCart(w http.ResponseWriter, r *http.Request) {
-	contextUserID := r.Context().Value("userID").(float64)
-	buyerID := uint(contextUserID)
+func GetCart(c *fiber.Ctx) error {
+	buyerID := uint(c.Locals("userID").(float64))
 
 	var cart models.Cart
-
 	result := database.DB.Preload("Items.Product").Where("user_id = ?", buyerID).First(&cart)
 
 	if result.Error != nil {
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Cart is currently empty"})
-		return
+		return c.JSON(fiber.Map{"message": "Cart is currently empty"})
 	}
 
 	var totalPrice float64
@@ -67,12 +55,9 @@ func GetCart(w http.ResponseWriter, r *http.Request) {
 		totalPrice += float64(item.Quantity) * item.Product.Price
 	}
 
-	response := map[string]interface{}{
+	return c.JSON(fiber.Map{
 		"cart_id":     cart.ID,
 		"items":       cart.Items,
 		"total_price": totalPrice,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	})
 }

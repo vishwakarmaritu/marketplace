@@ -1,46 +1,32 @@
 package routes
 
 import (
-	"net/http"
-
+	"github.com/gofiber/fiber/v2"
 	"github.com/vishwakarmaritu/marketplace/internal/handlers"
 	"github.com/vishwakarmaritu/marketplace/internal/middleware"
 )
 
-func RegisterRoutes() {
+func RegisterRoutes(app *fiber.App) {
 
-	http.HandleFunc("/api/auth/signup", handlers.Signup)
-	http.HandleFunc("/api/auth/login", handlers.Login)
+	api := app.Group("/api")
 
-	http.HandleFunc("/api/products", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			handlers.GetProducts(w, r)
-		} else if r.Method == http.MethodPost {
-			middleware.RequireRole("seller", "admin")(handlers.CreateProduct).ServeHTTP(w, r)
-		} else {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
+	api.Get("/health", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"status": "healthy"})
 	})
 
-	http.HandleFunc("/api/products/", middleware.RequireRole("seller", "admin")(handlers.ManageProduct))
+	api.Post("/auth/signup", handlers.Signup)
+	api.Post("/auth/login", handlers.Login)
+	api.Get("/products", handlers.GetProducts)
 
-	http.HandleFunc("/api/coupons", middleware.RequireRole("seller")(handlers.CreateCoupon))
+	sellerRoutes := api.Group("/", middleware.RequireRole("seller", "admin"))
+	sellerRoutes.Post("/products", handlers.CreateProduct)
+	sellerRoutes.Put("/products/:id", handlers.ManageProduct)
+	sellerRoutes.Delete("/products/:id", handlers.ManageProduct)
 
-	http.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "healthy", "message": "Server and database are responding cleanly"}`))
-	})
+	api.Post("/coupons", middleware.RequireRole("seller"), handlers.CreateCoupon)
 
-	http.HandleFunc("/api/cart", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			middleware.RequireRole("buyer")(handlers.GetCart).ServeHTTP(w, r)
-		} else if r.Method == http.MethodPost {
-			middleware.RequireRole("buyer")(handlers.AddToCart).ServeHTTP(w, r)
-		} else {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
-
-	http.HandleFunc("/api/checkout", middleware.RequireRole("buyer")(handlers.Checkout))
+	buyerRoutes := api.Group("/", middleware.RequireRole("buyer"))
+	buyerRoutes.Get("/cart", handlers.GetCart)
+	buyerRoutes.Post("/cart", handlers.AddToCart)
+	buyerRoutes.Post("/checkout", handlers.Checkout)
 }

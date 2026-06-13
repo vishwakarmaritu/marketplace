@@ -1,11 +1,10 @@
 package middleware
 
 import (
-	"context"
-	"net/http"
 	"os"
 	"strings"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -17,56 +16,49 @@ func init() {
 	}
 }
 
-func RequireRole(allowedRoles ...string) func(http.HandlerFunc) http.HandlerFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
+func RequireRole(allowedRoles ...string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
 
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-				http.Error(w, "Unauthorized: Missing or invalid token", http.StatusUnauthorized)
-				return
-			}
-
-			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-
-			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-				return jwtSecret, nil
-			})
-
-			if err != nil || !token.Valid {
-				http.Error(w, "Unauthorized: Invalid or expired token", http.StatusUnauthorized)
-				return
-			}
-
-			claims, ok := token.Claims.(jwt.MapClaims)
-			if !ok {
-				http.Error(w, "Unauthorized: Invalid token claims", http.StatusUnauthorized)
-				return
-			}
-
-			userRole, ok := claims["role"].(string)
-			if !ok {
-				http.Error(w, "Unauthorized: Role missing from token", http.StatusUnauthorized)
-				return
-			}
-
-			roleAllowed := false
-			for _, role := range allowedRoles {
-				if userRole == role {
-					roleAllowed = true
-					break
-				}
-			}
-
-			if !roleAllowed {
-				http.Error(w, "403 Forbidden: You do not have permission to perform this action", http.StatusForbidden)
-				return
-			}
-
-			ctx := context.WithValue(r.Context(), "userID", claims["user_id"])
-			ctx = context.WithValue(ctx, "userRole", userRole)
-
-			next.ServeHTTP(w, r.WithContext(ctx))
+		authHeader := c.Get("Authorization")
+		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			return c.Status(fiber.StatusUnauthorized).SendString("Unauthorized: Missing or invalid token")
 		}
+
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			return jwtSecret, nil
+		})
+
+		if err != nil || !token.Valid {
+			return c.Status(fiber.StatusUnauthorized).SendString("Unauthorized: Invalid or expired token")
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).SendString("Unauthorized: Invalid token claims")
+		}
+
+		userRole, ok := claims["role"].(string)
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).SendString("Unauthorized: Role missing from token")
+		}
+
+		roleAllowed := false
+		for _, role := range allowedRoles {
+			if userRole == role {
+				roleAllowed = true
+				break
+			}
+		}
+
+		if !roleAllowed {
+			return c.Status(fiber.StatusForbidden).SendString("403 Forbidden: You do not have permission to perform this action")
+		}
+
+		c.Locals("userID", claims["user_id"])
+		c.Locals("userRole", userRole)
+
+		return c.Next()
 	}
 }

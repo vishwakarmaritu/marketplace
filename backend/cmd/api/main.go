@@ -1,10 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"net/http"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/vishwakarmaritu/marketplace/internal/database"
 	"github.com/vishwakarmaritu/marketplace/internal/routes"
 )
@@ -12,12 +11,13 @@ import (
 func main() {
 	database.Connect()
 
-	routes.RegisterRoutes()
+	app := fiber.New()
 
-	port := ":8080"
-	fmt.Printf("Server is starting up and listening on port %s...\n", port)
+	routes.RegisterRoutes(app)
 
-	if err := http.ListenAndServe(port, nil); err != nil {
+	log.Println("Fiber server is starting up on port 8080...")
+
+	if err := app.Listen(":8080"); err != nil {
 		log.Fatalf("Fatal: Server failed to start: %v", err)
 	}
 }

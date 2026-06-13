@@ -1,11 +1,10 @@
 package handlers
 
 import (
-	"encoding/json"
-	"net/http"
 	"strings"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/vishwakarmaritu/marketplace/internal/database"
 	"github.com/vishwakarmaritu/marketplace/internal/models"
 )
@@ -16,17 +15,10 @@ type CouponRequest struct {
 	ExpiryDate time.Time `json:"expiry_date"`
 }
 
-func CreateCoupon(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func CreateCoupon(c *fiber.Ctx) error {
 	var req CouponRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body. Ensure expiry_date is in ISO-8601 format.", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body. Ensure expiry_date is in ISO-8601 format."})
 	}
 
 	coupon := models.Coupon{
@@ -37,10 +29,8 @@ func CreateCoupon(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if result := database.DB.Create(&coupon); result.Error != nil {
-		http.Error(w, "Failed to create coupon (Code might already exist)", http.StatusConflict)
-		return
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Failed to create coupon (Code might already exist)"})
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(coupon)
+	return c.Status(fiber.StatusCreated).JSON(coupon)
 }

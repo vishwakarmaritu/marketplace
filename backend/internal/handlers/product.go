@@ -1,11 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
-	"net/http"
-	"strconv"
-	"strings"
-
+	"github.com/gofiber/fiber/v2"
 	"github.com/vishwakarmaritu/marketplace/internal/database"
 	"github.com/vishwakarmaritu/marketplace/internal/models"
 )
@@ -17,15 +13,12 @@ type ProductRequest struct {
 	Stock       int     `json:"stock"`
 }
 
-func CreateProduct(w http.ResponseWriter, r *http.Request) {
-
-	contextUserID := r.Context().Value("userID").(float64)
-	sellerID := uint(contextUserID)
+func CreateProduct(c *fiber.Ctx) error {
+	sellerID := uint(c.Locals("userID").(float64))
 
 	var req ProductRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
 	product := models.Product{
@@ -37,58 +30,45 @@ func CreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if result := database.DB.Create(&product); result.Error != nil {
-		http.Error(w, "Failed to create product", http.StatusInternalServerError)
-		return
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create product"})
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(product)
+	return c.Status(fiber.StatusCreated).JSON(product)
 }
 
-func GetProducts(w http.ResponseWriter, r *http.Request) {
+func GetProducts(c *fiber.Ctx) error {
 	var products []models.Product
-
-	searchQuery := r.URL.Query().Get("search")
+	searchQuery := c.Query("search")
 
 	if searchQuery != "" {
-
 		database.DB.Where("title ILIKE ?", "%"+searchQuery+"%").Find(&products)
 	} else {
-
 		database.DB.Find(&products)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(products)
+	return c.JSON(products)
 }
 
-func ManageProduct(w http.ResponseWriter, r *http.Request) {
-
-	idStr := strings.TrimPrefix(r.URL.Path, "/api/products/")
-	productID, err := strconv.Atoi(idStr)
+func ManageProduct(c *fiber.Ctx) error {
+	productID, err := c.ParamsInt("id")
 	if err != nil || productID == 0 {
-		http.Error(w, "Invalid product ID", http.StatusBadRequest)
-		return
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid product ID"})
 	}
 
 	var product models.Product
 	if result := database.DB.First(&product, productID); result.Error != nil {
-		http.Error(w, "Product not found", http.StatusNotFound)
-		return
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Product not found"})
 	}
 
-	if r.Method == http.MethodDelete {
+	if c.Method() == fiber.MethodDelete {
 		database.DB.Delete(&product)
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Product deleted successfully"})
-		return
+		return c.JSON(fiber.Map{"message": "Product deleted successfully"})
 	}
 
-	if r.Method == http.MethodPut {
+	if c.Method() == fiber.MethodPut {
 		var req ProductRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			return
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 		}
 
 		product.Title = req.Title
@@ -97,10 +77,8 @@ func ManageProduct(w http.ResponseWriter, r *http.Request) {
 		product.Stock = req.Stock
 
 		database.DB.Save(&product)
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(product)
-		return
+		return c.JSON(product)
 	}
 
-	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	return c.Status(fiber.StatusMethodNotAllowed).JSON(fiber.Map{"error": "Method not allowed"})
 }
