@@ -18,14 +18,6 @@ type AuthRequest struct {
 	Role     models.Role `json:"role"`
 }
 
-var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
-
-func init() {
-	if len(jwtSecret) == 0 {
-		jwtSecret = []byte("super-secret-key-for-local-testing-only")
-	}
-}
-
 func Signup(c *fiber.Ctx) error {
 	var req AuthRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -72,8 +64,13 @@ func Login(c *fiber.Ctx) error {
 		"exp":     time.Now().Add(time.Hour * 72).Unix(),
 	}
 
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Server missing JWT secret"})
+	}
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	t, err := token.SignedString(jwtSecret)
+	t, err := token.SignedString([]byte(secret))
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Could not generate token"})
 	}

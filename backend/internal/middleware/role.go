@@ -8,16 +8,12 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
-
-func init() {
-	if len(jwtSecret) == 0 {
-		jwtSecret = []byte("super-secret-key-for-local-testing-only")
-	}
-}
-
 func RequireRole(allowedRoles ...string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		secret := os.Getenv("JWT_SECRET")
+		if secret == "" {
+			return c.Status(fiber.StatusInternalServerError).SendString("Server error: Missing JWT configuration")
+		}
 
 		authHeader := c.Get("Authorization")
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
@@ -27,7 +23,7 @@ func RequireRole(allowedRoles ...string) fiber.Handler {
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			return jwtSecret, nil
+			return []byte(secret), nil
 		})
 
 		if err != nil || !token.Valid {

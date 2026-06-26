@@ -28,5 +28,22 @@ func RegisterRoutes(app *fiber.App) {
 	buyerRoutes := api.Group("/", middleware.RequireRole("buyer"))
 	buyerRoutes.Get("/cart", handlers.GetCart)
 	buyerRoutes.Post("/cart", handlers.AddToCart)
-	buyerRoutes.Post("/checkout", handlers.Checkout)
+	buyerRoutes.Post("/orders/checkout", handlers.Checkout)
+	buyerRoutes.Post("/products/:id/reviews", handlers.CreateReview)
+	buyerRoutes.Post("/orders/:id/dispute", handlers.RaiseDispute)
+
+	trackingRoutes := api.Group("/", middleware.RequireRole("buyer", "ops", "admin"))
+	trackingRoutes.Get("/orders/track/:id", handlers.GetOrderTracking)
+
+	fulfillmentRoutes := api.Group("/", middleware.RequireRole("ops", "admin"))
+	fulfillmentRoutes.Patch("/orders/:id/status", handlers.UpdateOrderStatus)
+
+	adminRoutes := api.Group("/admin", middleware.RequireRole("admin"))
+
+	adminRoutes.Get("/disputes", handlers.GetAllDisputes)
+	adminRoutes.Patch("/disputes/:id", handlers.AdminResolveDispute)
+	adminRoutes.Delete("/users/:id", handlers.DeleteUser)
+
+	analyticsRoutes := api.Group("/analytics", middleware.RequireRole("admin", "ops"))
+	analyticsRoutes.Get("/", handlers.GetMarketplaceAnalytics)
 }

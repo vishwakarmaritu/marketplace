@@ -16,8 +16,7 @@ func Connect() {
 
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
-
-		dsn = "host=localhost user=postgres password=mediocritu22 dbname=marketplace port=5432 sslmode=disable"
+		log.Fatal("Fatal: DATABASE_URL environment variable is missing. Check your .env file.")
 	}
 
 	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
@@ -35,6 +34,7 @@ func Connect() {
 		&models.CartItem{},
 		&models.Order{},
 		&models.OrderItem{},
+		&models.Review{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database schemas: %v", err)

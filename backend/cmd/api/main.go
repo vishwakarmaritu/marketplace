@@ -4,11 +4,15 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/joho/godotenv"
 	"github.com/vishwakarmaritu/marketplace/internal/database"
 	"github.com/vishwakarmaritu/marketplace/internal/routes"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("Warning: No .env file found, relying on system environment variables")
+	}
 	database.Connect()
 
 	app := fiber.New()
